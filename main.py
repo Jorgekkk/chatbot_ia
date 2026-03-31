@@ -1,5 +1,5 @@
 import os
-from google import genai
+import requests # Necesitamos esta librería
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,12 +7,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Configuración con la nueva librería
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-
 app = FastAPI()
 
-# Mantener tus CORS igual...
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -26,16 +22,29 @@ class Mensaje(BaseModel):
 
 @app.post("/api/chat")
 def responder_chat(mensaje: Mensaje):
+    api_key = os.getenv("GEMINI_API_KEY")
+    # URL oficial de Google sin librerías intermedias
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    payload = {
+        "contents": [{
+            "parts": [{"text": mensaje.texto}]
+        }],
+        "system_instruction": {
+            "parts": [{"text": "Eres el asistente de la tienda VEN FCC. Sé breve y amable."}]
+        }
+    }
+
     try:
+        response = requests.post(url, json=payload)
+        data = response.json()
         
-        response = client.models.generate_content(
-            model="gemini-1.5-flash", 
-            contents=mensaje.texto,
-            config={
-                "system_instruction": "Eres el asistente de VEN FCC, una tienda universitaria. Sé breve y amigable."
-            }
-        )
-        return {"respuesta": response.text}
+        
+        if "candidates" in data:
+            texto_ia = data["candidates"][0]["content"]["parts"][0]["text"]
+            return {"respuesta": texto_ia}
+        else:
+            return {"respuesta": f"Error de la IA: {str(data)}"}
+            
     except Exception as e:
-        print(f"ERROR: {str(e)}")
-        return {"respuesta": f"Error: {str(e)}"}
+        return {"respuesta": f"Error de conexión: {str(e)}"}
