@@ -1,5 +1,5 @@
 import os
-import requests # Necesitamos esta librería
+import requests
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -9,6 +9,7 @@ load_dotenv()
 
 app = FastAPI()
 
+# Permisos para que tu Angular se conecte sin problemas
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -22,28 +23,44 @@ class Mensaje(BaseModel):
 
 @app.post("/api/chat")
 def responder_chat(mensaje: Mensaje):
-    api_key = os.getenv("GEMINI_API_KEY")
+    # Obtenemos la llave de Groq
+    api_key = os.getenv("GROQ_API_KEY")
     
-    # CAMBIO 1: Cambiamos 'v1beta' por 'v1' y el nombre del modelo a 'gemini-1.5-flash'
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={api_key}"
+    # Validamos que la llave exista para no fallar a ciegas
+    if not api_key:
+        return {"respuesta": "Error del servidor: Falta la API Key de Groq."}
+
+    # URL oficial de Groq (compatible con el formato OpenAI)
+    url = "https://api.groq.com/openai/v1/chat/completions"
     
-    # CAMBIO 2: Simplificamos el payload (quitamos system_instruction por ahora para asegurar conexión)
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+
+    # Configuramos el modelo Llama 3 (súper rápido y gratuito)
     payload = {
-        "contents": [{
-            "parts": [{"text": f"Responde como asistente de la tienda VEN FCC de forma breve: {mensaje.texto}"}]
-        }]
+        "model": "llama3-8b-8192", 
+        "messages": [
+            {"role": "system", "content": "Eres el asistente virtual de VEN FCC, una tienda universitaria. Sé amigable, breve y ayuda con dudas sobre entregas o pagos."},
+            {"role": "user", "content": mensaje.texto}
+        ]
     }
 
     try:
-        response = requests.post(url, json=payload)
+        # Hacemos la petición a Groq
+        response = requests.post(url, headers=headers, json=payload)
         data = response.json()
         
-        # Depuración: Si falla, esto nos dirá qué dice Google ahora
-        if "candidates" in data and len(data["candidates"]) > 0:
-            texto_ia = data["candidates"][0]["content"]["parts"][0]["text"]
-            return {"respuesta": texto_ia}
+        # Si Groq responde con éxito (200 OK)
+        if response.status_code == 200:
+            respuesta_texto = data['choices'][0]['message']['content']
+            return {"respuesta": respuesta_texto}
         else:
-            return {"respuesta": f"Error detallado de Google: {str(data)}"}
+            # Si Groq nos manda un error (ej. llave inválida)
+            error_msg = data.get('error', {}).get('message', 'Error desconocido')
+            return {"respuesta": f"Error de Groq: {error_msg}"}
             
     except Exception as e:
-        return {"respuesta": f"Error de conexión: {str(e)}"}
+        # Si el servidor se queda sin internet o algo crashea
+        return {"respuesta": f"Error interno de conexión: {str(e)}"}
