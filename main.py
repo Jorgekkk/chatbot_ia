@@ -17,7 +17,10 @@ Eres el asistente virtual de VEN FCC, una tienda universitaria.
 Responde dudas sobre entregas (en la explanada) y pagos (Mercado Pago). 
 Sé breve, amigable y nunca inventes precios.
 """
-modelo = genai.GenerativeModel(model_name="gemini-1.5-flash", system_instruction=instrucciones)
+modelo = genai.GenerativeModel(
+    model_name="gemini-pro", 
+    system_instruction=instrucciones
+)
 
 app = FastAPI()
 
