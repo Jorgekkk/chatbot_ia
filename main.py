@@ -38,4 +38,5 @@ def responder_chat(mensaje: Mensaje):
         respuesta = modelo.generate_content(mensaje.texto)
         return {"respuesta": respuesta.text}
     except Exception as e:
-        return {"respuesta": "Ups, tengo un problema de conexión. Intenta de nuevo."}
+        print(f"ERROR DE IA DETECTADO: {str(e)}") 
+        return {"respuesta": f"Error interno: {str(e)}"} 
